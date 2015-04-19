@@ -13,13 +13,12 @@ public class FileScan extends Iterator {
   /**
    * Constructs a file scan, given the schema and heap file.
    */
-	private Schema _schema;
 	private HeapScan _scanner;
 	private HeapFile _file;
 	private RID		_rid;
 	private boolean _isOpen;
   public FileScan(Schema schema, HeapFile file) {
-    _schema = schema;
+	this.schema = schema;
     _file = file;
     _scanner = _file.openScan();
     _isOpen = true;
@@ -74,7 +73,7 @@ public class FileScan extends Iterator {
   public Tuple getNext() {
 	  _rid = new RID();
     byte[] data = _scanner.getNext(_rid);
-    Tuple tuple = new Tuple(_schema, data);
+    Tuple tuple = new Tuple(schema, data);
     return tuple;
   }
 
