@@ -1,10 +1,14 @@
 package relop;
 
+import java.util.ArrayList;
+import java.util.Random;
+
 import global.RID;
 import global.SearchKey;
 import heap.HeapFile;
 import index.BucketScan;
 import index.HashIndex;
+
 
 /**
  * Implements the hash-based join algorithm described in section 14.4.3 of the
@@ -18,6 +22,8 @@ public class HashJoin extends Iterator {
    * Constructs a hash join, given the left and right iterators and which
    * columns to match (relative to their individual schemas).
    */
+	private static final String CHAR_LIST = 
+	        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
 	private Iterator _left;
 	private Iterator _right;
 	private Integer _lcol;
@@ -25,6 +31,8 @@ public class HashJoin extends Iterator {
 	private IndexScan _lbucket;
 	private IndexScan _rbucket;
 	private Tuple nextTuple;
+	
+	ArrayList<String> _tuples;
 	
 	IndexScan innerIndexScan;
 	IndexScan outerIndexScan;
@@ -37,6 +45,7 @@ public class HashJoin extends Iterator {
 	  _lcol = lcol;
 	  _rcol = rcol;
 	  schema = Schema.join(left.schema, right.schema);
+	  _tuples = new ArrayList<String>();
 	  
 	  _hashtable = new HashTableDup();
 	  currentIndex = -1;
@@ -53,11 +62,11 @@ public class HashJoin extends Iterator {
 		  rh.insertEntry(new SearchKey(rfScan.getNext().getField(rcol)), rfScan.getLastRID());
 	  }
 	  innerIndexScan = new IndexScan(right.schema, rh, rfScan._file);
-	  //makeIndexScan(true, left, _lcol);
-	  //makeIndexScan(false, right, _rcol);
+	  
 	  makeHashTable();
-	  printIndexScan();
+	  outerIndexScan.restart();
   }
+  
   
   public void printIndexScan() {
 	  System.out.println("Left");
@@ -66,13 +75,29 @@ public class HashJoin extends Iterator {
 		  tuple.print();
 	  }
   }
+  private int getRandomNumber() {
+      int randomInt = 0;
+      Random randomGenerator = new Random();
+      randomInt = randomGenerator.nextInt(CHAR_LIST.length());
+      if (randomInt - 1 == -1) {
+          return randomInt;
+      } else {
+          return randomInt - 1;
+      }
+  }
   
   public FileScan convertFileScan(Iterator iter){
       FileScan f;
+      StringBuffer randStr = new StringBuffer();
+      for(int i=0; i<16; i++){
+          int number = getRandomNumber();
+          char ch = CHAR_LIST.charAt(number);
+          randStr.append(ch);
+      }
       if(iter instanceof IndexScan){
    	   f = new FileScan(iter.schema, ((IndexScan) iter)._file);
       } else{
-   	   HeapFile file = new HeapFile("123" + iter.toString());
+   	   HeapFile file = new HeapFile(randStr.toString());
    	   while(iter.hasNext()){
    		   file.insertRecord(iter.getNext().data);
    	   }
@@ -85,27 +110,11 @@ public class HashJoin extends Iterator {
   public void makeHashTable() {
 	  while(outerIndexScan.hasNext()) {
 		  Tuple tuple = outerIndexScan.getNext();
-		  SearchKey hash = outerIndexScan.getLastKey();
+		  SearchKey hash = new SearchKey(tuple.getField(_lcol).toString());
 		  _hashtable.add(hash, tuple);
 	  }
   }
   
-  public IndexScan getBucketOrIndexScan(Iterator iter, Integer col) {
-	  if(iter instanceof FileScan) {
-		  HashIndex index = new HashIndex(((FileScan) iter)._file.toString());
-		  IndexScan scanner = new IndexScan(iter.schema, index, ((FileScan) iter)._file);
-		  return scanner;
-	  } else if (iter instanceof IndexScan) {
-		  return ((IndexScan)iter);
-	  } else {
-		  HeapFile file = new HeapFile(null);
-		  while(iter.hasNext()) {
-			  file.insertRecord(iter.getNext().data);
-		  }
-		  FileScan scanner = new FileScan(iter.schema, file);
-		  return getBucketOrIndexScan(scanner, col);
-	  }
-  }
 
   /**
    * Gives a one-line explaination of the iterator, repeats the call on any
@@ -119,6 +128,7 @@ public class HashJoin extends Iterator {
    * Restarts the iterator, i.e. as if it were just constructed.
    */
   public void restart() {
+	  _tuples = new ArrayList<String>();
     outerIndexScan.restart();
     innerIndexScan.restart();
     currentRight = null;
@@ -155,22 +165,32 @@ public class HashJoin extends Iterator {
 			  nextTuple = null;
 			  return false;
 		  }
+		  currentIndex = 0;
 	  }
-	  currentIndex++;
+	  
 	  SearchKey key = new SearchKey(currentRight.getField(_rcol).toString());
 	  Tuple[] tuples = _hashtable.getAll(key);
 	  if(tuples == null) {
+		  //System.out.println("NULL");
 		  currentIndex = -1;
 		  return hasNext();
 	  }
 	  if(currentIndex >= tuples.length) {
+		  //System.out.println("OUT");
 		  currentIndex = -1;
 		  return hasNext();
 	  }
+	  //System.out.println("OK");
 	  Tuple leftTuple = tuples[currentIndex];
 	  nextTuple = Tuple.join(leftTuple, currentRight, schema);
 	  currentIndex++;
-	  return true;
+	  if(!_tuples.contains(new String(nextTuple.data))) {
+		  _tuples.add(new String(nextTuple.data));
+		  return true;
+	  } else {
+		  //System.out.println("Found dup");
+		  return hasNext();
+	  }
   }
 
   /**
