@@ -14,7 +14,7 @@ public class FileScan extends Iterator {
    * Constructs a file scan, given the schema and heap file.
    */
 	private HeapScan _scanner;
-	private HeapFile _file;
+	public HeapFile _file;
 	private RID		_rid;
 	private boolean _isOpen;
   public FileScan(Schema schema, HeapFile file) {

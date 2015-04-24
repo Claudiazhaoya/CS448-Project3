@@ -17,8 +17,8 @@ public class IndexScan extends Iterator {
    */
 	
 	//private Schema _schema;
-	private BucketScan _scanner;
-	private HeapFile _file;
+	BucketScan _scanner;
+	HeapFile _file;
 	private RID		_rid;
 	private boolean _isOpen;
 	private HashIndex _index;
